@@ -6,23 +6,31 @@ import (
 	"github.com/xztaityozx/go-utils/logger"
 )
 
-var Logger *logger.Logger = logger.New()
+type Dirs struct {
+	Logger *logger.Logger
+}
 
-func TryMkDir(f string, perm os.FileMode) error {
+func New() *Dirs {
+	return &Dirs{
+		Logger: logger.New(),
+	}
+}
+
+func (dirs Dirs) TryMkDir(f string, perm os.FileMode) error {
 	if _, statE := os.Stat(f); statE != nil {
 		if mkE := os.MkdirAll(f, perm); mkE != nil {
 			return mkE
 		}
-		Logger.Println("Mkdir : ", f)
+		dirs.Logger.Println("Mkdir : ", f)
 	}
 	return nil
 }
 
-func TryMkDirAuto(f string) error {
-	return TryMkDir(f, 0644)
+func (dirs Dirs) TryMkDirAuto(f string) error {
+	return dirs.TryMkDir(f, 0644)
 }
 
-func TryMkDirSuppress(f string, perm os.FileMode) error {
+func (dirs Dirs) TryMkDirSuppress(f string, perm os.FileMode) error {
 	if _, statE := os.Stat(f); statE != nil {
 		if mkE := os.MkdirAll(f, perm); mkE != nil {
 			return mkE
@@ -31,13 +39,13 @@ func TryMkDirSuppress(f string, perm os.FileMode) error {
 	return nil
 }
 
-func TryMkDirSuppressAuto(f string) error {
-	return TryMkDirSuppress(f, 0644)
+func (dirs Dirs) TryMkDirSuppressAuto(f string) error {
+	return dirs.TryMkDirSuppress(f, 0644)
 }
 
-func TryChDir(f string, perm os.FileMode) error {
+func (dirs Dirs) TryChDir(f string, perm os.FileMode) error {
 	if _, statE := os.Stat(f); statE != nil {
-		if mkE := TryMkDir(f, perm); mkE != nil {
+		if mkE := dirs.TryMkDir(f, perm); mkE != nil {
 			return mkE
 		}
 
@@ -45,13 +53,13 @@ func TryChDir(f string, perm os.FileMode) error {
 			return chE
 		}
 
-		Logger.Println("Chdir : ", f)
+		dirs.Logger.Println("Chdir : ", f)
 	}
 	return nil
 }
-func TryChDirSuppress(f string, perm os.FileMode) error {
+func (dirs Dirs) TryChDirSuppress(f string, perm os.FileMode) error {
 	if _, statE := os.Stat(f); statE != nil {
-		if mkE := TryMkDirSuppress(f, perm); mkE != nil {
+		if mkE := dirs.TryMkDirSuppress(f, perm); mkE != nil {
 			return mkE
 		}
 
@@ -63,10 +71,10 @@ func TryChDirSuppress(f string, perm os.FileMode) error {
 	return nil
 }
 
-func TryChDirAuto(f string) error {
-	return TryChDir(f, 0644)
+func (dirs Dirs) TryChDirAuto(f string) error {
+	return dirs.TryChDir(f, 0644)
 }
 
-func TryChDirSuppressAuto(f string) error {
-	return TryChDirSuppress(f, 0644)
+func (dirs Dirs) TryChDirSuppressAuto(f string) error {
+	return dirs.TryChDirSuppress(f, 0644)
 }
