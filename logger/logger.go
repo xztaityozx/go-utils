@@ -3,6 +3,7 @@ package logger
 import (
 	"fmt"
 	"io"
+	"io/ioutil"
 	"log"
 	"os"
 	"strings"
@@ -195,4 +196,22 @@ func (lgr Logger) FatalExit(err error) {
 	if err != nil {
 		lgr.Fatal(err)
 	}
+}
+
+func (lgr Logger) PrintFromFile(f string) error {
+	b, err := ioutil.ReadFile(f)
+	if err != nil {
+		return err
+	}
+
+	lgr.Print(string(b))
+}
+
+func (lgr Logger) FatalFromFile(f string) error {
+	b, err := ioutil.ReadFile(f)
+	if err != nil {
+		return err
+	}
+
+	lgr.Fatal(string(b))
 }
