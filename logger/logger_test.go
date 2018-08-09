@@ -18,7 +18,7 @@ func TestAllLogger(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		if lgr.Logfile != "" {
+		if lgr.Logfile != "/dev/null" {
 			t.Fail()
 		}
 
