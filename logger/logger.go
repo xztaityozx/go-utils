@@ -15,16 +15,8 @@ type Logger struct {
 	PrintColor    string
 	FatalColor    string
 	Logger        *log.Logger
-	fp            *os.File
 }
 
-func (lgr *Logger) Close() error {
-	if err := lgr.fp.Close(); err != nil {
-		return err
-	}
-
-	return os.Stderr.Close()
-}
 func New() *Logger {
 	return &Logger{
 		ColorMap: map[string]string{
@@ -45,56 +37,6 @@ func New() *Logger {
 
 func (lgr *Logger) AppendLoggerColor(name string, ansi string) {
 	lgr.ColorMap[name] = ansi
-}
-
-func (lgr *Logger) ToggleMultiLog() (bool, error) {
-	if lgr.IsMultiLogger {
-		lgr.OffMultiLogger()
-	} else {
-		if err := lgr.OnMultiLogger(); err != nil {
-			return false, err
-		}
-	}
-
-	return lgr.IsMultiLogger, nil
-}
-
-func (lgr *Logger) OnMultiLogger() error {
-	if lgr.IsMultiLogger {
-		return nil
-	}
-
-	lgr.IsMultiLogger = true
-	return setOutFile(lgr, lgr.Logfile)
-}
-
-func (lgr *Logger) OffMultiLogger() {
-	if !lgr.IsMultiLogger {
-		return
-	}
-
-	lgr.IsMultiLogger = false
-	setSingle(lgr, os.Stderr)
-}
-
-func setOutFile(lgr *Logger, f string) error {
-	if _, err := os.Stat(f); err != nil {
-		return err
-	}
-
-	fp, err := os.OpenFile(f, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
-	if err != nil {
-		return err
-	}
-	lgr.fp = fp
-
-	setSingle(lgr, io.MultiWriter(fp, os.Stderr))
-	return nil
-}
-
-func setSingle(lgr *Logger, w io.Writer) {
-	lgr.Logger.SetOutput(w)
-	lgr.Logger.SetFlags(log.Ldate | log.Ltime)
 }
 
 func (lgr *Logger) SetPrintColorDirect(color string) {
@@ -120,7 +62,7 @@ func (lgr *Logger) SetLogFile(f string) error {
 
 	lgr.Logfile = f
 
-	return setOutFile(lgr, f)
+	return nil
 }
 
 func (lgr *Logger) TrySetLogFile(f string) error {
@@ -134,7 +76,13 @@ func (lgr *Logger) TrySetLogFile(f string) error {
 }
 
 func (lgr Logger) Print(v ...interface{}) {
-	log.Print(lgr.PrintColor, v, lgr.ColorMap["Reset"])
+	fp, err := os.OpenFile(lgr.Logfile, os.O_WRONLY|os.O_APPEND|os.O_CREATE, 0644)
+	defer fp.Close()
+	if err != nil {
+		return
+	}
+	lgr.Logger.SetOutput(io.MultiWriter(os.Stderr, fp))
+	lgr.Logger.Print(lgr.PrintColor, v, lgr.ColorMap["Reset"])
 }
 
 func (lgr Logger) Println(v ...interface{}) {
@@ -146,6 +94,12 @@ func (lgr Logger) Printf(format string, v ...interface{}) {
 }
 
 func (lgr Logger) Fatal(v ...interface{}) {
+	fp, err := os.OpenFile(lgr.Logfile, os.O_WRONLY|os.O_APPEND|os.O_CREATE, 0644)
+	defer fp.Close()
+	if err != nil {
+		return
+	}
+	lgr.Logger.SetOutput(io.MultiWriter(os.Stderr, fp))
 	lgr.Logger.Fatal(lgr.FatalColor, v, lgr.ColorMap["Reset"])
 }
 
@@ -166,9 +120,8 @@ func (lgr Logger) SwitchPrint(fatal bool, v ...interface{}) {
 }
 
 func (lgr Logger) FatalStdErrOnly(v ...interface{}) {
-	setSingle(&lgr, os.Stderr)
+	lgr.Logger.SetOutput(os.Stderr)
 	lgr.Fatal(v)
-	setOutFile(&lgr, lgr.Logfile)
 }
 
 func (lgr Logger) FatallnStdErrOnly(v ...interface{}) {
@@ -178,11 +131,9 @@ func (lgr Logger) FatallnStdErrOnly(v ...interface{}) {
 func (lgr Logger) FatalfStdErrOnly(format string, v ...interface{}) {
 	lgr.FatalStdErrOnly(fmt.Sprintf(format, v))
 }
-
 func (lgr Logger) PrintStdErrOnly(v ...interface{}) {
-	setSingle(&lgr, os.Stderr)
+	lgr.Logger.SetOutput(os.Stderr)
 	lgr.Print(v)
-	setOutFile(&lgr, lgr.Logfile)
 }
 
 func (lgr Logger) PrintlnStdErrOnly(v ...interface{}) {
@@ -194,40 +145,38 @@ func (lgr Logger) PrintfStdErrOnly(format string, v ...interface{}) {
 }
 
 func (lgr Logger) FatalFileOnly(v ...interface{}) {
-	fp, _ := os.OpenFile(lgr.Logfile, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0644)
-	*lgr.fp = *fp
-	w := io.MultiWriter(os.Stderr, fp)
-	setSingle(&lgr, fp)
-
-	lgr.Print(v)
-
-	setSingle(&lgr, w)
+	fp, err := os.OpenFile(lgr.Logfile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	defer fp.Close()
+	if err != nil {
+		return
+	}
+	lgr.Logger.SetOutput(fp)
+	lgr.Fatal(v)
 }
 
 func (lgr Logger) FatallnFileOnly(v ...interface{}) {
-	lgr.FatallnFileOnly(v, "\n")
+	lgr.FatalFileOnly(v, "\n")
 }
 
 func (lgr Logger) FatalfFileOnly(format string, v ...interface{}) {
-	lgr.FatallnFileOnly(fmt.Sprintf(format, v))
+	lgr.FatalFileOnly(fmt.Sprintf(format, v))
 }
 func (lgr Logger) PrintFileOnly(v ...interface{}) {
-	fp, _ := os.OpenFile(lgr.Logfile, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0644)
-	*lgr.fp = *fp
-	w := io.MultiWriter(os.Stderr, fp)
-	setSingle(&lgr, fp)
-
+	fp, err := os.OpenFile(lgr.Logfile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	defer fp.Close()
+	if err != nil {
+		return
+	}
+	lgr.Logger.SetOutput(fp)
 	lgr.Print(v)
-
-	setSingle(&lgr, w)
 }
 
 func (lgr Logger) PrintlnFileOnly(v ...interface{}) {
-	lgr.PrintlnFileOnly(v, "\n")
+	lgr.PrintFileOnly(v, "\n")
 }
 
 func (lgr Logger) PrintfFileOnly(format string, v ...interface{}) {
-	lgr.PrintlnFileOnly(fmt.Sprintf(format, v))
+	lgr.PrintFileOnly(fmt.Sprintf(format, v))
 }
 
 func (lgr Logger) PrintSeparator(sep string, length int) {
