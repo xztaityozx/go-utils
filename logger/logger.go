@@ -15,8 +15,16 @@ type Logger struct {
 	PrintColor    string
 	FatalColor    string
 	Logger        *log.Logger
+	fp            *os.File
 }
 
+func (lgr *Logger) Close() error {
+	if err := lgr.fp.Close(); err != nil {
+		return err
+	}
+
+	return os.Stderr.Close()
+}
 func New() *Logger {
 	return &Logger{
 		ColorMap: map[string]string{
@@ -78,6 +86,7 @@ func setOutFile(lgr *Logger, f string) error {
 	if err != nil {
 		return err
 	}
+	lgr.fp = fp
 
 	setSingle(lgr, io.MultiWriter(fp, os.Stderr))
 	return nil
@@ -157,13 +166,9 @@ func (lgr Logger) SwitchPrint(fatal bool, v ...interface{}) {
 }
 
 func (lgr Logger) FatalStdErrOnly(v ...interface{}) {
-	fp, _ := os.OpenFile(lgr.Logfile, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0644)
-	w := io.MultiWriter(os.Stderr, fp)
 	setSingle(&lgr, os.Stderr)
-
 	lgr.Fatal(v)
-
-	setSingle(&lgr, w)
+	setOutFile(&lgr, lgr.Logfile)
 }
 
 func (lgr Logger) FatallnStdErrOnly(v ...interface{}) {
@@ -175,13 +180,9 @@ func (lgr Logger) FatalfStdErrOnly(format string, v ...interface{}) {
 }
 
 func (lgr Logger) PrintStdErrOnly(v ...interface{}) {
-	fp, _ := os.OpenFile(lgr.Logfile, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0644)
-	w := io.MultiWriter(os.Stderr, fp)
 	setSingle(&lgr, os.Stderr)
-
 	lgr.Print(v)
-
-	setSingle(&lgr, w)
+	setOutFile(&lgr, lgr.Logfile)
 }
 
 func (lgr Logger) PrintlnStdErrOnly(v ...interface{}) {
@@ -194,6 +195,7 @@ func (lgr Logger) PrintfStdErrOnly(format string, v ...interface{}) {
 
 func (lgr Logger) FatalFileOnly(v ...interface{}) {
 	fp, _ := os.OpenFile(lgr.Logfile, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0644)
+	*lgr.fp = *fp
 	w := io.MultiWriter(os.Stderr, fp)
 	setSingle(&lgr, fp)
 
@@ -211,6 +213,7 @@ func (lgr Logger) FatalfFileOnly(format string, v ...interface{}) {
 }
 func (lgr Logger) PrintFileOnly(v ...interface{}) {
 	fp, _ := os.OpenFile(lgr.Logfile, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0644)
+	*lgr.fp = *fp
 	w := io.MultiWriter(os.Stderr, fp)
 	setSingle(&lgr, fp)
 
