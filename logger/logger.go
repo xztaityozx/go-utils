@@ -205,6 +205,7 @@ func (lgr Logger) PrintFromFile(f string) error {
 	}
 
 	lgr.Print(string(b))
+	return nil
 }
 
 func (lgr Logger) FatalFromFile(f string) error {
@@ -214,4 +215,5 @@ func (lgr Logger) FatalFromFile(f string) error {
 	}
 
 	lgr.Fatal(string(b))
+	return nil
 }
